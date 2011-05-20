@@ -24,7 +24,7 @@ Extends WordPress' template system to support printer-friendly templates for pos
 First, navigate to Options > Permalinks in WP Admin and click 'Save Changes.' If links still don't appear, visit http://www.thinkoomph.com/plugins-modules/wp-print-friendly/ and leave a comment detailing the problem.
 
 = How should I name print templates? =
-Print templates should be prefixed with 'wpf' and follow WordPress template conventions from there. For custom post types, 'wpf-[post type name].php' will be used for that post type. Similarly, 'wpf-home.php' will load that template for the front page of your site. The plugin includes a default template that may suit many needs.
+Print templates should be prefixed with 'wpf' and follow WordPress template conventions from there. To use one template for all contexts unless otherwise specified, name your template 'wpf.php.' For custom post types, 'wpf-[post type name].php' will be used for that post type. Similarly, 'wpf-home.php' will load that template for the front page of your site. The plugin includes a default template that may suit many needs.
 
 = How do I add a print link to my templates? =
 The function `wpf_the_print_link` will add a link to the print-friendly version of whatever page it appears on. This function accepts the following arguments:
