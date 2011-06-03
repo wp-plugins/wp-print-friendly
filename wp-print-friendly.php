@@ -119,7 +119,7 @@ class wp_print_friendly {
 	 */
 	function is_print() {
 		global $wp_query;
-		return array_key_exists( 'print', $wp_query->query );
+		return is_array( $wp_query->query ) && array_key_exists( 'print', $wp_query->query );
 	}
 	
 	/*
