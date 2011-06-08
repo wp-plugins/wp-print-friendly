@@ -4,7 +4,7 @@ Plugin Name: WP Print Friendly
 Plugin URI: http://www.thinkoomph.com/plugins-modules/wp-print-friendly/
 Description: Extends WordPress' template system to support printer-friendly templates. Works with permalink structures to support nice URLs.
 Author: Erick Hitter (Oomph, Inc.)
-Version: 0.3
+Version: 0.3.2
 Author URI: http://www.thinkoomph.com/
 */
 
@@ -397,13 +397,14 @@ class wp_print_friendly {
 			<form action="options.php" method="post">
 				<?php
 					settings_fields( $this->settings_key );
-					$options = get_option( $this->settings_key, array(
+					$options = wp_parse_args( get_option( $this->settings_key ), array(
 						'auto' => 0,
 						'placement' => 'below',
 						'post_types' => array( 'post', 'page' ),
 						'print_text' => 'Print this entry',
 						'print_text_page' => 'Print this page',
-						'css_class' => 'print_link'
+						'css_class' => 'print_link',
+						'link_target' => 'same'
 					) );
 					
 					$post_types = $this->post_types_array();
@@ -455,6 +456,13 @@ class wp_print_friendly {
 							<p class="description">Be aware that Internet Explorer will only interpret the first two CSS classes, so if multiple classes are entered above, the page-specific class may not be available in IE.</p>
 						</td>
 					</tr>
+					<tr>
+						<th scope="row"><?php _e( 'Open print-friendly views in:', $this->ns ); ?></th>
+						<td>
+							<input type="radio" name="<?php echo $this->settings_key; ?>[link_target]" id="target-same" value="same"<?php checked( $options[ 'link_target' ], 'same', true ); ?> /> <label for="target-same"><?php _e( 'In the same window', $this->ns ); ?></label><br />
+							<input type="radio" name="<?php echo $this->settings_key; ?>[link_target]" id="target-new" value="new"<?php checked( $options[ 'link_target' ], 'new', true ); ?> /> <label for="target-new"><?php _e( 'In a new window', $this->ns ); ?></label>
+						</td>
+					</tr>
 				</table>
 				
 				<p class="submit">
@@ -495,6 +503,8 @@ class wp_print_friendly {
 		$css_class = esc_attr( $options[ 'css_class' ] );
 		$new_options[ 'css_class' ] = !empty( $css_class ) ? $css_class : 'print_link';
 		
+		$new_options[ 'link_target' ] = $options[ 'link_target' ] == 'new' ? 'new' : 'same';
+		
 		return $new_options;
 	}
 	
@@ -529,10 +539,10 @@ class wp_print_friendly {
 			$print_url = $this->print_url();
 			$print_url_page = $this->print_url( false, true );
 			
-			$link = '<p class="wpf_wrapper"><a class="' . $css_class . '" href="' . $print_url . '">' . $print_text . '</a>';
+			$link = '<p class="wpf_wrapper"><a class="' . $css_class . '" href="' . $print_url . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $print_text . '</a>';
 			if( !empty( $print_text_page ) ) {
 				$link .= ' | ';
-				$link .= '<a class="' . $css_class . $css_class . '_cur" href="' . $print_url_page . '">' . $print_text_page . '</a>';
+				$link .= '<a class="' . $css_class . $css_class . '_cur" href="' . $print_url_page . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $print_text_page . '</a>';
 			}
 			$link .= '</p><!-- .wpf_wrapper -->';
 			
@@ -598,20 +608,21 @@ function wpf_get_print_url( $post_id = false, $page = false ) {
  * @param bool $page_link
  * @param string $page_link_separator
  * @param string $page_link_text
+ * @param string $link_target
  * @uses $post, wpf_get_print_url, get_query_var
  * @return string or null
  */
-function wpf_the_print_link( $page_link = false, $link_text = 'Print this post', $class = 'print_link', $page_link_separator = ' | ', $page_link_text = 'Print this page' ) {
+function wpf_the_print_link( $page_link = false, $link_text = 'Print this post', $class = 'print_link', $page_link_separator = ' | ', $page_link_text = 'Print this page', $link_target = 'same' ) {
 	global $post;
 	$url = wpf_get_print_url( $post->ID );
 	
 	if( $url ) {
-		$link = '<a ' . ( $class ? 'class="' . $class . '"' : '' ) . ' href="' . $url . '">' . $link_text . '</a>';
+		$link = '<a ' . ( $class ? 'class="' . $class . '"' : '' ) . ' href="' . $url . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $link_text . '</a>';
 		
 		if( $page_link && strpos( $post->post_content, '<!--nextpage-->' ) !== false ) {
 			$page = get_query_var( 'page' );
 			$page = !empty( $page ) ? $page : 0;
-			$link .= $page_link_separator . '<a ' . ( $class ? 'class="' . $class . '_cur ' . $class . '"' : '' ) . ' href="' . wpf_get_print_url( $post->ID, $page ) . '">' . $page_link_text . '</a>';
+			$link .= $page_link_separator . '<a ' . ( $class ? 'class="' . $class . '_cur ' . $class . '"' : '' ) . ' href="' . wpf_get_print_url( $post->ID, $page ) . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $page_link_text . '</a>';
 		}
 		
 		echo $link;
