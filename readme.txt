@@ -39,7 +39,7 @@ The function `wpf_the_print_link` will add a link to the print-friendly version 
 
 = 0.4 =
 * Child pages now fully supported.
-* Generate and register rewrite rules more efficiently.
+* Generates and registers rewrite rules more efficiently.
 * Rewrite setting for all post types and taxonomies are now considered when adding print support.
 * Add option to disable endnotes representing links found in content.
 * Move copyright and other static elements from content filters to default template.
