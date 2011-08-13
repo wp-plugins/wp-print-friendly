@@ -20,7 +20,8 @@ class wp_print_friendly {
 		'print_text_page' => 'Print this page',
 		'css_class' => 'print_link',
 		'link_target' => 'same',
-		'endnotes' => true
+		'endnotes' => true,
+		'endnotes_label' => 'Endnotes:'
 	);
 	
 	var $notice_key = 'wpf_admin_notice_dismissed';
@@ -55,7 +56,7 @@ class wp_print_friendly {
 	 * @return null
 	 */
 	function action_plugins_loaded() {
-		add_action( 'init', array( $this, 'action_init' ), 999 );
+		add_action( 'delete_option_rewrite_rules', array( $this, 'action_init' ), 999 );
 		add_action( 'admin_init', array( $this, 'action_admin_init' ) );
 		add_action( 'admin_menu', array( $this, 'action_admin_menu' ) );
 		add_filter( 'query_vars', array( $this, 'filter_query_vars' ) );
@@ -86,7 +87,8 @@ class wp_print_friendly {
 			add_rewrite_endpoint( 'print', 9999 );
 			
 			//Custom post types
-			$post_types = get_post_types( array( '_builtin' => false ), 'objects' );
+			$post_types = $this->get_options();
+			$post_types = $post_types[ 'post_types' ];
 			foreach( $post_types as $post_type ) {
 				if( $post_type->rewrite == false )
 					continue;
@@ -380,7 +382,7 @@ class wp_print_friendly {
 					
 					//Output endnotes
 					$endnotes = '<div class="wpf-endnotes">';
-					$endnotes .= '<strong>Endnotes</strong>';
+					$endnotes .= '<strong>' . $options[ 'endnotes_label' ] . '</strong>';
 					$endnotes .= '<ol>';
 					foreach( $links as $link ) {
 						$endnotes .= '<li>';
@@ -463,8 +465,12 @@ class wp_print_friendly {
 				if( $wp_rewrite->use_trailing_slashes )
 					$link = trailingslashit( $link );
 			}
-			else
+			else {
 				$link = add_query_arg( 'print', is_numeric( $page ) ? intval( $page ) : 'all', $link );
+				
+				if( $page )
+					$link = add_query_arg( 'page', is_numeric( $page ) ? intval( $page ) : 'all', $link );
+			}
 		}
 		
 		return $link;
@@ -562,7 +568,7 @@ class wp_print_friendly {
 					</tr>
 				</table>
 				
-				<h3>Other Options</h3>
+				<h3>Endnote Options</h3>
 				
 				<table class="form-table">
 					<tr>
@@ -571,6 +577,14 @@ class wp_print_friendly {
 							<input type="checkbox" name="<?php echo $this->settings_key; ?>[endnotes]" id="endnotes" value="1"<?php checked( $options[ 'endnotes' ], true, true ); ?> /> <label for="endnotes"><?php _e( 'Yes', $this->ns ); ?></label>
 							
 							<p class="description"><?php _e( 'If enabled, content is automatically scanned for links and an endnote is added for each link found. This can be helpful for users if your content includes many links.', $this->ns ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="endnotes-label"><?php _e( 'Endnotes heading:', $this->ns ); ?></label></th>
+						<td>
+							<input type="text" name="<?php echo $this->settings_key; ?>[endnotes_label]" class="regular-text code" id="endnotes-label" value="<?php echo esc_attr( $options[ 'endnotes_label' ] ); ?>" />
+							
+							<p class="description"><?php _e( 'If endnotes are enabled, the text entered above will be output above the list of links.', $this->ns ); ?></p>
 						</td>
 					</tr>
 				</table>
@@ -587,10 +601,12 @@ class wp_print_friendly {
 	/*
 	 * Validate options
 	 * @param array $options
-	 * @uses $this::post_types_array, sanitize_text_field
+	 * @uses $this::get_options, $this::post_types_array, delete_option, sanitize_text_field
 	 * @return array
 	 */
 	function admin_options_validate( $options ) {
+		$old_options = $this->get_options();
+		
 		$new_options = array(
 			'endnotes' => false
 		);
@@ -624,11 +640,15 @@ class wp_print_friendly {
 									$new_options[ $key ][] = $post_type->name;
 							}
 						}
+						
+						if( $new_options[ $key ] != $old_options[ $key ] )
+							delete_option( $this->notice_key );
 					break;
 					
 					case 'print_text':
 					case 'print_text_page':
 					case 'css_class':
+					case 'endnotes_label':
 						$value = sanitize_text_field( $value );
 						
 						if( $key == 'print_text' && empty( $value ) )
