@@ -15,7 +15,12 @@
 					<p>by <?php the_author(); ?> | <?php the_time( 'F j, Y g:i a' ); ?></p>
 					
 					<?php the_content(); ?>
-	
+					
+					<?php
+						if( function_exists( 'wpf_the_page_numbers' ) )
+							wpf_the_page_numbers( false, '<p class="page_numbers">Page ', ' of ', '</p><!-- .page_numbers -->' );
+					?>
+					
 					<p class="wpf-source"><strong>Source URL:</strong> <?php the_permalink(); ?></p>
 					
 					<hr class="wpf-divider" />

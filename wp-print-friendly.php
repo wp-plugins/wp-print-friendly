@@ -59,6 +59,7 @@ class wp_print_friendly {
 		add_action( 'admin_init', array( $this, 'action_admin_init' ) );
 		add_action( 'admin_menu', array( $this, 'action_admin_menu' ) );
 		add_filter( 'query_vars', array( $this, 'filter_query_vars' ) );
+		add_filter( 'page_rewrite_rules', array( $this, 'filter_page_rewrite_rules' ), 99 );
 		add_filter( 'request', array( $this, 'filter_request' ) );
 		add_action( 'pre_get_posts', array( $this, 'action_pre_get_posts' ) );
 		add_filter( 'template_include', array( $this, 'filter_template_include' ) );
@@ -84,12 +85,11 @@ class wp_print_friendly {
 			//Posts
 			add_rewrite_endpoint( 'print', 9999 );
 			
-			//Pages
-			add_rewrite_rule( '([^/]+?)(/[0-9]+)?/print(/(.*))?/?', 'index.php?pagename=$matches[1]&page=$matches[2]&print=$matches[3]', 'top' );
-			
 			//Custom post types
 			$post_types = get_post_types( array( '_builtin' => false ), 'objects' );
 			foreach( $post_types as $post_type ) {
+				if( $post_type->rewrite == false )
+					continue;
 				
 				$post_type_slug = '';
 				if( $post_type->rewrite[ 'with_front' ] && $wp_rewrite->front != '/' ) $post_type_slug .= $wp_rewrite->front;
@@ -101,6 +101,9 @@ class wp_print_friendly {
 			//Taxonomies
 			$taxonomies = get_taxonomies( array(), 'objects' );
 			foreach( $taxonomies as $taxonomy => $args ) {
+				if( $args->rewrite == false )
+					continue;
+				
 				$taxonomy_slug = '';
 				if( $args->rewrite[ 'with_front' ] && $wp_rewrite->front != '/' ) $taxonomy_slug .= $wp_rewrite->front;
 				$taxonomy_slug .= $args->rewrite[ 'slug' ];
@@ -109,6 +112,8 @@ class wp_print_friendly {
 				
 				add_rewrite_rule( $taxonomy_slug . '/([^/]+)?/print(/(.*))?/?$', 'index.php?' . $query_var . '=$matches[1]&print=$matches[2]', 'top' );
 			}
+			
+			//Pages - now handled via $this::filter_page_rewrite_rules() to prevent their generality from conflicting with other rewrite rules.
 		}
 	}
 	
@@ -188,6 +193,21 @@ class wp_print_friendly {
 		$query_vars[] = 'print';
 	
 		return $query_vars;
+	}
+	
+	/*
+	 * Add print rewrite rules for pages
+	 * @param array $rules
+	 * @return array
+	 */
+	function filter_page_rewrite_rules( $rules ) {
+		$page_rules = array(
+			'(.+?)/print(/[0-9]+)?/?$' => 'index.php?pagename=$matches[1]&print=$matches[2]'
+		);
+		
+		$rules = array_merge( $page_rules, $rules );
+		
+		return $rules;
 	}
 	
 	/*
@@ -281,7 +301,7 @@ class wp_print_friendly {
 	/*
 	 * Filter the content if automatic inclusion is selected
 	 * @param string $content
-	 * @uses $this::get_options, apply_filters
+	 * @uses $this::get_options, $post, $this::print_url, get_query_var, apply_filters
 	 * @filter the_content
 	 * @return string
 	 */
@@ -291,16 +311,30 @@ class wp_print_friendly {
 		if( is_array( $options ) && array_key_exists( 'auto', $options ) && $options[ 'auto' ] == true && !$this->is_print() ) {
 			extract( $options );
 			
-			$print_url = $this->print_url();
-			$print_url_page = $this->print_url( false, true );
+			global $post;
 			
-			$link = '<p class="wpf_wrapper"><a class="' . $css_class . '" href="' . $print_url . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $print_text . '</a>';
-			if( !empty( $print_text_page ) ) {
-				$link .= ' | ';
-				$link .= '<a class="' . $css_class . $css_class . '_cur" href="' . $print_url_page . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $print_text_page . '</a>';
+			//Basic URL
+			$print_url = $this->print_url();
+			
+			//Page URL, if necessary
+			if( !empty( $print_text_page ) && strpos( $post->post_content, '<!--nextpage-->' ) !== false ) {
+				$page = get_query_var( 'page' );
+				$page = $page ? $page : 1;
+				
+				$print_url_page = $this->print_url( false, $page );
 			}
+			
+			//Build link(s)
+			$link = '<p class="wpf_wrapper"><a class="' . $css_class . '" href="' . $print_url . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $print_text . '</a>';
+			
+			if( isset( $print_url_page ) ) {
+				$link .= ' | ';
+				$link .= '<a class="' . $css_class . ' ' . $css_class . '_cur" href="' . $print_url_page . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $print_text_page . '</a>';
+			}
+			
 			$link .= '</p><!-- .wpf_wrapper -->';
 			
+			//Place link(s)
 			if( $placement == 'above' )
 				$content = $link . $content;
 			elseif( $placement == 'below' )
@@ -365,16 +399,17 @@ class wp_print_friendly {
 	 * Generate URL for post's printer-friendly format
 	 * @param int $post_id
 	 * @param int $page
-	 * @uses is_home, is_front_page, home_url, $post, get_permalink, is_category, get_category_link, is_tag, get_tag_link, is_date, get_query_var, get_day_link, get_month_link, get_year_link, is_tax, get_queried_object, get_term_link, $wp_rewrite, add_query_arg
+	 * @uses is_home, is_front_page, home_url, $post, get_permalink, is_category, get_category_link, is_tag, get_tag_link, is_date, get_query_var, get_day_link, get_month_link, get_year_link, is_tax, get_queried_object, get_term_link, $wp_rewrite, path_join, trailingslashit, add_query_arg
 	 * @return string or bool
 	 */
 	function print_url( $post_id = false, $page = false ) {
+		if( $page === true )
+			return false;
+		
 		$link = false;
 		
 		//Get link base specific to page type being viewed
-		if( is_home() || is_front_page() )
-			$link = home_url( '/' );
-		elseif( is_singular() ) {
+		if( is_singular() || in_the_loop() ) {
 			if( $post_id === false ) {
 				global $post;
 				$post_id = $post->ID;
@@ -385,6 +420,8 @@ class wp_print_friendly {
 			
 			$link = get_permalink( $post_id );
 		}
+		elseif( is_home() || is_front_page() )
+			$link = home_url( '/' );
 		elseif( is_category() )
 			$link = get_category_link( get_query_var( 'cat' ) );
 		elseif( is_tag() )
@@ -413,13 +450,19 @@ class wp_print_friendly {
 		if( $link !== false ) {
 			global $wp_rewrite;
 			
-			if( $wp_rewrite->permalink_structure ) {
-				$link .= $wp_rewrite->use_trailing_slashes ? 'print/' : '/print';
-				if( is_numeric( $page ) )
-					$link .= $wp_rewrite->use_trailing_slashes ? (int)$page . '/' : '/' . (int)$page;
+			$page = intval( $page );
+			
+			if( $wp_rewrite->using_permalinks() ) {
+				$link = path_join( $link, 'print' );
+				
+				if( $page )
+					$link = path_join( $link, intval( $page ) );
+				
+				if( $wp_rewrite->use_trailing_slashes )
+					$link = trailingslashit( $link );
 			}
 			else
-				$link = add_query_arg( 'print', is_numeric( $page ) ? (int)$page : 'all', $link );
+				$link = add_query_arg( 'print', is_numeric( $page ) ? intval( $page ) : 'all', $link );
 		}
 		
 		return $link;
@@ -651,6 +694,65 @@ class wp_print_friendly {
 		<?php
 		endif;
 	}
+	
+	/*
+	 * Render page numbers, such as "Page 1 of 5."
+	 * @param int $post_id
+	 * @param string $before
+	 * @param string $separator
+	 * @param string $after
+	 * @uses $this::is_print, get_query_var, get_post_field, wp_kses_post
+	 * @return string or false
+	 */
+	function page_numbers( $post_id = false, $before = 'Page ', $separator = ' of ', $after = '' ) {
+		if( !$this->is_print() )
+			return false;
+		
+		//Don't display on views that include all pages of a post
+		$print = get_query_var( 'print' );
+		if( $print == 'all' || $print == '/all' || empty( $print ) )
+			return false;
+		
+		//Get post ID and post content, or return false it either fails validation
+		$post_id = intval( $post_id );
+		
+		if( !$post_id ) {
+			global $post;
+			$post_id = $post->ID;
+			$post_content = $post->post_content;
+		}
+		
+		$post_id = intval( $post_id );
+		
+		if( !$post_id )
+			return false;
+		
+		if( !isset( $post_content ) || empty( $post_content ) )
+			$post_content = get_post_field( 'post_content', $post_id );
+		
+		if( !is_string( $post_content ) || empty( $post_content ) || strpos( $post_content, '<!--nextpage-->' ) === false )
+			return false;
+		
+		//Get current page
+		$page = get_query_var( 'page' );
+		$page = $page ? $page : 1;
+		
+		//Get total number of pages, or return false if total cannot be determined
+		$num_pages = substr_count( $post_content, '<!--nextpage-->' );
+		
+		if( is_int( $num_pages ) && $num_pages > 0 )
+			$num_pages = $num_pages + 1;
+		else
+			return false;
+		
+		//Sanitize formatting variables
+		$before = wp_filter_kses_post( $before );
+		$separator = wp_filter_kses_post( $separator );
+		$after = wp_filter_kses_post( $after );
+		
+		//Having made it this far, return the specified string
+		return $before . $page . $separator . $num_pages . $after;
+	}
 }
 global $wpf;
 $wpf = new wp_print_friendly;
@@ -664,11 +766,10 @@ $wpf = new wp_print_friendly;
  */
 function wpf_get_print_url( $post_id = false, $page = false ) {
 	global $wpf;
-	
-	if( !is_object( $wpf ) || !is_a( $wpf, 'wp_print_friendly' ) )
-		$wpf = new cp_print;
+	if( !is_a( $wpf, 'wp_print_friendly' ) )
+		$wpf = new wp_print_friendly;
 		
-	return $wpf->print_url( $post_id, $page );
+	return $wpf->print_url( intval( $post_id ), intval( $page ) );
 }
 
 /*
@@ -680,24 +781,48 @@ function wpf_get_print_url( $post_id = false, $page = false ) {
  * @param string $page_link_separator
  * @param string $page_link_text
  * @param string $link_target
- * @uses $post, wpf_get_print_url, get_query_var
+ * @uses $post, wpf_get_print_url, esc_attr, esc_url, get_query_var
  * @return string or null
  */
 function wpf_the_print_link( $page_link = false, $link_text = 'Print this post', $class = 'print_link', $page_link_separator = ' | ', $page_link_text = 'Print this page', $link_target = 'same' ) {
 	global $post;
 	$url = wpf_get_print_url( $post->ID );
 	
+	$page_link = (bool)$page_link;
+	
 	if( $url ) {
-		$link = '<a ' . ( $class ? 'class="' . $class . '"' : '' ) . ' href="' . $url . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $link_text . '</a>';
+		$link = '<a ' . ( $class ? 'class="' . esc_attr( $class ) . '"' : '' ) . ' href="' . esc_url( $url ) . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $link_text . '</a>';
 		
 		if( $page_link && strpos( $post->post_content, '<!--nextpage-->' ) !== false ) {
 			$page = get_query_var( 'page' );
-			$page = !empty( $page ) ? $page : 0;
-			$link .= $page_link_separator . '<a ' . ( $class ? 'class="' . $class . '_cur ' . $class . '"' : '' ) . ' href="' . wpf_get_print_url( $post->ID, $page ) . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $page_link_text . '</a>';
+			$page = $page ? $page : 0;
+			$link .= $page_link_separator . '<a ' . ( $class ? 'class="' . esc_attr( $class ) . '_cur ' . esc_attr( $class ) . '"' : '' ) . ' href="' . esc_url( wpf_get_print_url( $post->ID, $page ) ) . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $page_link_text . '</a>';
 		}
 		
 		echo $link;
 	}
+}
+
+/*
+ * Display page numbers, such as "Page 1 of 5."
+ * @param int $post_id
+ * @param string $before
+ * @param string $separator
+ * @param string $after
+ * @uses $wpf, wp_filter_post_kses
+ * @return string or false
+ */
+function wpf_the_page_numbers( $post_id = false, $before = 'Page ', $separator = ' of ', $after = '' ) {
+	global $wpf;
+	if( !is_a( $wpf, 'wp_print_friendly' ) )
+		$wpf = new wp_print_friendly;
+	
+	$post_id = intval( $post_id );
+	$before = wp_filter_post_kses( $before );
+	$separator = wp_filter_post_kses( $separator );
+	$after = wp_filter_post_kses( $after );
+	
+	echo $wpf->page_numbers( $post_id, $before, $separator, $after );
 }
 
 if( !function_exists( 'is_print' ) ) {
@@ -708,8 +833,7 @@ if( !function_exists( 'is_print' ) ) {
 	 */
 	function is_print() {
 		global $wpf;
-		
-		if( !is_object( $wpf ) || !is_a( $wpf, 'wp_print_friendly' ) )
+		if( !is_a( $wpf, 'wp_print_friendly' ) )
 			$wpf = new wp_print_friendly;
 			
 		return $wpf->is_print();
