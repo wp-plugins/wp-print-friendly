@@ -4,7 +4,7 @@ Plugin Name: WP Print Friendly
 Plugin URI: http://www.thinkoomph.com/plugins-modules/wp-print-friendly/
 Description: Extends WordPress' template system to support printer-friendly templates. Works with permalink structures to support nice URLs.
 Author: Erick Hitter (Oomph, Inc.)
-Version: 0.4
+Version: 0.4.1
 Author URI: http://www.thinkoomph.com/
 */
 
@@ -56,7 +56,7 @@ class wp_print_friendly {
 	 * @return null
 	 */
 	function action_plugins_loaded() {
-		add_action( 'delete_option_rewrite_rules', array( $this, 'action_init' ), 999 );
+		add_action( 'delete_option_rewrite_rules', array( $this, 'action_delete_option_rewrite_rules' ), 999 );
 		add_action( 'admin_init', array( $this, 'action_admin_init' ) );
 		add_action( 'admin_menu', array( $this, 'action_admin_menu' ) );
 		add_filter( 'query_vars', array( $this, 'filter_query_vars' ) );
@@ -75,11 +75,11 @@ class wp_print_friendly {
 	
 	/*
 	 * Add print rewrite rules if not using default permalinks.
-	 * @uses $wp_rewrite, add_rewrite_endpoint, add_rewrite_rule, get_post_types
+	 * @uses $wp_rewrite, add_rewrite_endpoint, get_post_types, add_rewrite_rule, get_taxonomies
 	 * @action init
 	 * @return null
 	 */
-	function action_init() {
+	function action_delete_option_rewrite_rules() {
 		global $wp_rewrite;
 		
 		if( $wp_rewrite->permalink_structure ) {
@@ -87,8 +87,7 @@ class wp_print_friendly {
 			add_rewrite_endpoint( 'print', 9999 );
 			
 			//Custom post types
-			$post_types = $this->get_options();
-			$post_types = $post_types[ 'post_types' ];
+			$post_types = get_post_types( array( '_builtin' => false ), 'names' );
 			foreach( $post_types as $post_type ) {
 				if( $post_type->rewrite == false )
 					continue;
@@ -311,11 +310,11 @@ class wp_print_friendly {
 	 */
 	function filter_the_content_auto( $content ) {
 		$options = $this->get_options();
-				
-		if( is_array( $options ) && array_key_exists( 'auto', $options ) && $options[ 'auto' ] == true && !$this->is_print() ) {
+		
+		global $post;
+		
+		if( is_array( $options ) && array_key_exists( 'auto', $options ) && $options[ 'auto' ] == true && in_array( $post->post_type, $options[ 'post_types' ] ) && !$this->is_print() ) {
 			extract( $options );
-			
-			global $post;
 			
 			//Basic URL
 			$print_url = $this->print_url();
@@ -605,8 +604,6 @@ class wp_print_friendly {
 	 * @return array
 	 */
 	function admin_options_validate( $options ) {
-		$old_options = $this->get_options();
-		
 		$new_options = array(
 			'endnotes' => false
 		);
@@ -640,9 +637,6 @@ class wp_print_friendly {
 									$new_options[ $key ][] = $post_type->name;
 							}
 						}
-						
-						if( $new_options[ $key ] != $old_options[ $key ] )
-							delete_option( $this->notice_key );
 					break;
 					
 					case 'print_text':
