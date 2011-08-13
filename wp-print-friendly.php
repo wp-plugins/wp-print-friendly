@@ -95,7 +95,7 @@ class wp_print_friendly {
 				if( $post_type->rewrite[ 'with_front' ] && $wp_rewrite->front != '/' ) $post_type_slug .= $wp_rewrite->front;
 				$post_type_slug .= $post_type->rewrite[ 'slug' ];
 				
-				add_rewrite_rule( $post_type_slug . '/([^/]+)(/[0-9]+)?/print(/(.*))?/?$', 'index.php?' . $post_type->query_var . '=$matches[1]&page=$matches[2]&print=$matches[3]', 'top' );
+				add_rewrite_rule( $post_type_slug . '/([^/]+)(/[0-9]+)?/print(/(.*))?/?$', $wp_rewrite->index . '?' . $post_type->query_var . '=$matches[1]&page=$matches[2]&print=$matches[3]', 'top' );
 			}
 			
 			//Taxonomies
@@ -110,7 +110,7 @@ class wp_print_friendly {
 				
 				$query_var = $args->query_var ? $args->query_var : 'taxonomy=' . $taxonomy . '&term';
 				
-				add_rewrite_rule( $taxonomy_slug . '/([^/]+)?/print(/(.*))?/?$', 'index.php?' . $query_var . '=$matches[1]&print=$matches[2]', 'top' );
+				add_rewrite_rule( $taxonomy_slug . '/([^/]+)?/print(/(.*))?/?$', $wp_rewrite->index . '?' . $query_var . '=$matches[1]&print=$matches[2]', 'top' );
 			}
 			
 			//Pages - now handled via $this::filter_page_rewrite_rules() to prevent their generality from conflicting with other rewrite rules.
@@ -201,8 +201,10 @@ class wp_print_friendly {
 	 * @return array
 	 */
 	function filter_page_rewrite_rules( $rules ) {
+		global $wp_rewrite;
+		
 		$page_rules = array(
-			'(.+?)/print(/[0-9]+)?/?$' => 'index.php?pagename=$matches[1]&print=$matches[2]'
+			'(.+?)/print(/[0-9]+)?/?$' => $wp_rewrite->index . '?pagename=$matches[1]&print=$matches[2]'
 		);
 		
 		$rules = array_merge( $page_rules, $rules );
@@ -382,7 +384,7 @@ class wp_print_friendly {
 					$endnotes .= '<ol>';
 					foreach( $links as $link ) {
 						$endnotes .= '<li>';
-						$endnotes .= $link[ 'title' ] . ': ' . $link[ 'url' ];
+						$endnotes .=  preg_replace( '#<img(.*)>#', '[Image]', $link[ 'title' ] ) . ': ' . esc_url( $link[ 'url' ] );
 						$endnotes .= '</li>';
 					}
 					$endnotes .= '</ol></div><!-- .wpf-endnotes -->';
@@ -701,7 +703,7 @@ class wp_print_friendly {
 	 * @param string $before
 	 * @param string $separator
 	 * @param string $after
-	 * @uses $this::is_print, get_query_var, get_post_field, wp_kses_post
+	 * @uses $this::is_print, get_query_var, get_post_field
 	 * @return string or false
 	 */
 	function page_numbers( $post_id = false, $before = 'Page ', $separator = ' of ', $after = '' ) {
@@ -744,11 +746,6 @@ class wp_print_friendly {
 			$num_pages = $num_pages + 1;
 		else
 			return false;
-		
-		//Sanitize formatting variables
-		$before = wp_filter_kses_post( $before );
-		$separator = wp_filter_kses_post( $separator );
-		$after = wp_filter_kses_post( $after );
 		
 		//Having made it this far, return the specified string
 		return $before . $page . $separator . $num_pages . $after;
@@ -809,7 +806,7 @@ function wpf_the_print_link( $page_link = false, $link_text = 'Print this post',
  * @param string $before
  * @param string $separator
  * @param string $after
- * @uses $wpf, wp_filter_post_kses
+ * @uses $wpf
  * @return string or false
  */
 function wpf_the_page_numbers( $post_id = false, $before = 'Page ', $separator = ' of ', $after = '' ) {
@@ -817,12 +814,7 @@ function wpf_the_page_numbers( $post_id = false, $before = 'Page ', $separator =
 	if( !is_a( $wpf, 'wp_print_friendly' ) )
 		$wpf = new wp_print_friendly;
 	
-	$post_id = intval( $post_id );
-	$before = wp_filter_post_kses( $before );
-	$separator = wp_filter_post_kses( $separator );
-	$after = wp_filter_post_kses( $after );
-	
-	echo $wpf->page_numbers( $post_id, $before, $separator, $after );
+	echo $wpf->page_numbers( intval( $post_id ), $before, $separator, $after );
 }
 
 if( !function_exists( 'is_print' ) ) {

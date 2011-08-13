@@ -14,7 +14,12 @@
 					<h1><?php the_title(); ?></h1>
 					<p>by <?php the_author(); ?> | <?php the_time( 'F j, Y g:i a' ); ?></p>
 					
-					<?php the_content(); ?>
+					<?php
+						if( is_attachment() && wp_attachment_is_image() )
+							echo '<p>' . wp_get_attachment_image( $post->ID, 'large' ) . '</p>';
+							
+						the_content();
+					?>
 					
 					<?php
 						if( function_exists( 'wpf_the_page_numbers' ) )
@@ -30,6 +35,7 @@
 		endif;
 	?>
 	
-	Copyright &copy;<?php echo date( 'Y' ); ?> <strong><?php bloginfo( 'name' ); ?></strong> unless otherwise noted.
+		<p class="copyright">Copyright &copy;<?php echo date( 'Y' ); ?> <strong><?php bloginfo( 'name' ); ?></strong> unless otherwise noted.</p>
+		
 	</body>
 </html>
