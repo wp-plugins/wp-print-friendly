@@ -10,16 +10,21 @@
 			while( have_posts() ):
 				the_post();
 				?>
-				
-				<h1><?php the_title(); ?></h1>
-				<p>by <?php the_author(); ?> | <?php the_time( 'F j, Y g:i a' ); ?></p>
-				
+				<div <?php post_class(); ?>>
+					<h1><?php the_title(); ?></h1>
+					<p>by <?php the_author(); ?> | <?php the_time( 'F j, Y g:i a' ); ?></p>
+					
+					<?php the_content(); ?>
+	
+					<p class="wpf-source"><strong>Source URL:</strong> <?php the_permalink(); ?></p>
+					
+					<hr class="wpf-divider" />
+				</div>
 				<?php
-				the_content();
-				
 			endwhile;
 		endif;
 	?>
 	
+	Copyright &copy;<?php echo date( 'Y' ); ?> <strong><?php bloginfo( 'name' ); ?></strong> unless otherwise noted.
 	</body>
 </html>

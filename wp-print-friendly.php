@@ -4,13 +4,25 @@ Plugin Name: WP Print Friendly
 Plugin URI: http://www.thinkoomph.com/plugins-modules/wp-print-friendly/
 Description: Extends WordPress' template system to support printer-friendly templates. Works with permalink structures to support nice URLs.
 Author: Erick Hitter (Oomph, Inc.)
-Version: 0.3.2
+Version: 0.4
 Author URI: http://www.thinkoomph.com/
 */
 
 class wp_print_friendly {
 	var $ns = 'wp_print_friendly';
+	
 	var $settings_key = 'wpf';
+	var $settings_defaults = array(
+		'auto' => false,
+		'placement' => 'below',
+		'post_types' => array( 'post', 'page' ),
+		'print_text' => 'Print this entry',
+		'print_text_page' => 'Print this page',
+		'css_class' => 'print_link',
+		'link_target' => 'same',
+		'endnotes' => true
+	);
+	
 	var $notice_key = 'wpf_admin_notice_dismissed';
 	
 	/*
@@ -53,9 +65,10 @@ class wp_print_friendly {
 		add_filter( 'body_class', array( $this, 'filter_body_class' ) );
 		add_filter( 'the_content', array( $this, 'filter_the_content' ), 0 );
 		add_filter( 'the_content', array( $this, 'filter_the_content_auto' ) );
-		add_filter( 'the_content', array( $this, 'filter_the_content_links' ), 99 );
+		add_filter( 'the_content', array( $this, 'filter_the_content_late' ), 99 );
 		
-		if( !get_option( $this->notice_key ) ) add_action( 'admin_notices', array( $this, 'action_admin_notices_activation' ) );
+		if( !get_option( $this->notice_key ) )
+			add_action( 'admin_notices', array( $this, 'action_admin_notices_activation' ) );
 	}
 	
 	/*
@@ -266,45 +279,83 @@ class wp_print_friendly {
 	}
 	
 	/*
-	 * Convert links to endnotes
+	 * Filter the content if automatic inclusion is selected
 	 * @param string $content
+	 * @uses $this::get_options, apply_filters
 	 * @filter the_content
 	 * @return string
 	 */
-	function filter_the_content_links( $content ) {
+	function filter_the_content_auto( $content ) {
+		$options = $this->get_options();
+				
+		if( is_array( $options ) && array_key_exists( 'auto', $options ) && $options[ 'auto' ] == true && !$this->is_print() ) {
+			extract( $options );
+			
+			$print_url = $this->print_url();
+			$print_url_page = $this->print_url( false, true );
+			
+			$link = '<p class="wpf_wrapper"><a class="' . $css_class . '" href="' . $print_url . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $print_text . '</a>';
+			if( !empty( $print_text_page ) ) {
+				$link .= ' | ';
+				$link .= '<a class="' . $css_class . $css_class . '_cur" href="' . $print_url_page . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $print_text_page . '</a>';
+			}
+			$link .= '</p><!-- .wpf_wrapper -->';
+			
+			if( $placement == 'above' )
+				$content = $link . $content;
+			elseif( $placement == 'below' )
+				$content = $content . $link;
+			elseif( $placement == 'both' )
+				$content = $link . $content . $link;
+		}
+		
+		return $content;
+	}
+	
+	/*
+	 * Convert links to endnotes if desired
+	 * @param string $content
+	 * @uses $this::is_print, $this::get_options
+	 * @filter the_content
+	 * @return string
+	 */
+	function filter_the_content_late( $content ) {
 		if( $this->is_print() ) {
 			global $post;
 			
-			$links = array();
-			$i = 1;
+			$options = $this->get_options();
 			
-			//Build array of links
-			preg_match_all( '/<a(.*?)href=["\'](.*?)["\']>(.*?)<\/a>/i', $content, $matches );
-			
-			//Replace links with endnote markers
-			foreach( $matches[ 0 ] as $key => $match ) {
-				$content = str_replace( $match, $matches[ 3 ][ $key ] . ' [' . $i . ']', $content );
-				$links[ $i ][ 'title' ] = $matches[ 3 ][ $key ];
-				$links[ $i ][ 'url' ] = $matches[ 2 ][ $key ];
-				$i++;
+			//Endnotes
+			if( $options[ 'endnotes' ] ) {
+				$links = array();
+				$i = 1;
+				
+				//Build array of links
+				preg_match_all( '/<a(.*?)href=["\'](.*?)["\']>(.*?)<\/a>/i', $content, $matches );
+				
+				if( !empty( $matches[ 0 ] ) && !empty( $matches[ 1 ] ) && !empty( $matches[ 2 ] ) && !empty( $matches[ 3 ] ) ) {
+					//Replace links with endnote markers
+					foreach( $matches[ 0 ] as $key => $match ) {
+						$content = str_replace( $match, $matches[ 3 ][ $key ] . '[' . $i . ']', $content );
+						$links[ $i ][ 'title' ] = $matches[ 3 ][ $key ];
+						$links[ $i ][ 'url' ] = $matches[ 2 ][ $key ];
+						$i++;
+					}
+					
+					//Output endnotes
+					$endnotes = '<div class="wpf-endnotes">';
+					$endnotes .= '<strong>Endnotes</strong>';
+					$endnotes .= '<ol>';
+					foreach( $links as $link ) {
+						$endnotes .= '<li>';
+						$endnotes .= $link[ 'title' ] . ': ' . $link[ 'url' ];
+						$endnotes .= '</li>';
+					}
+					$endnotes .= '</ol></div><!-- .wpf-endnotes -->';
+					
+					$content .= $endnotes;
+				}
 			}
-			
-			//Output endnotes
-			$endnotes = '<div id="print-endnotes">';
-			$endnotes .= '<strong>Endnotes</strong>';
-			$endnotes .= '<ol>';
-			foreach( $links as $link ) {
-				$endnotes .= '<li>';
-				$endnotes .= $link[ 'title' ] . ': ' . $link[ 'url' ];
-				$endnotes .= '</li>';
-			}
-			$endnotes .= '</ol></div><!-- #print-endnotes -->';
-			
-			$content .= $endnotes;
-			
-			$content .= '<hr />';
-			$content .= 'Printed from <strong>' . get_permalink( $post->ID ) . '</strong>. Copyright &copy;' . date( 'Y' ) . ' <strong>' . get_bloginfo( 'name' ) . '</strong> unless otherwise noted.';
-			
 		}
 		
 		return $content;
@@ -386,7 +437,7 @@ class wp_print_friendly {
 	
 	/*
 	 * Render options page
-	 * @uses settings_fields, get_option, _e, checked, esc_attr
+	 * @uses settings_fields, $this::get_options, _e, checked, esc_attr
 	 * @return html
 	 */
 	function admin_options() {
@@ -397,25 +448,19 @@ class wp_print_friendly {
 			<form action="options.php" method="post">
 				<?php
 					settings_fields( $this->settings_key );
-					$options = wp_parse_args( get_option( $this->settings_key ), array(
-						'auto' => 0,
-						'placement' => 'below',
-						'post_types' => array( 'post', 'page' ),
-						'print_text' => 'Print this entry',
-						'print_text_page' => 'Print this page',
-						'css_class' => 'print_link',
-						'link_target' => 'same'
-					) );
+					$options = $this->get_options();
 					
 					$post_types = $this->post_types_array();
 				?>
+				
+				<h3>Display Options</h3>
 				
 				<table class="form-table">
 					<tr>
 						<th scope="row"><?php _e( 'Automatically add print links based on settings below?', $this->ns ); ?></th>
 						<td>
-							<input type="radio" name="<?php echo $this->settings_key; ?>[auto]" id="auto-true" value="1"<?php checked( $options[ 'auto' ], 1, true ); ?> /> <label for="auto-true"><?php _e( 'Yes', $this->ns ); ?></label><br />
-							<input type="radio" name="<?php echo $this->settings_key; ?>[auto]" id="auto-false" value="0"<?php checked( $options[ 'auto' ], 0, true ); ?> /> <label for="auto-false"><?php _e( 'No', $this->ns ); ?></label>
+							<input type="radio" name="<?php echo $this->settings_key; ?>[auto]" id="auto-true" value="1"<?php checked( $options[ 'auto' ], true, true ); ?> /> <label for="auto-true"><?php _e( 'Yes', $this->ns ); ?></label><br />
+							<input type="radio" name="<?php echo $this->settings_key; ?>[auto]" id="auto-false" value="0"<?php checked( $options[ 'auto' ], false, true ); ?> /> <label for="auto-false"><?php _e( 'No', $this->ns ); ?></label>
 						</td>
 					</tr>
 					<tr>
@@ -434,6 +479,11 @@ class wp_print_friendly {
 							<?php endforeach; ?>
 						</td>
 					</tr>
+				</table>
+				
+				<h3>Link Options</h3>
+				
+				<table class="form-table">
 					<tr>
 						<th scope="row"><?php _e( 'Text for link to print entire item:', $this->ns ); ?></th>
 						<td>
@@ -444,23 +494,38 @@ class wp_print_friendly {
 						<th scope="row"><?php _e( 'Text for link to print current page:', $this->ns ); ?></th>
 						<td>
 							<input type="text" name="<?php echo $this->settings_key; ?>[print_text_page]" id="print_text_page" value="<?php echo esc_attr( $options[ 'print_text_page' ] ); ?>" style="width: 40%;" />
-							<p class="description">If viewing a multipage post (set by using the &lt;!--nextpage--&gt; tag), the text above is used for a link to print just the current page.</p>
-							<p class="description"><strong>To hide this link,</strong> clear the field's contents.</p>
+							
+							<p class="description"><?php _e( 'If viewing a multipage post (set by using the &lt;!--nextpage--&gt; tag), the text above is used for a link to print just the current page.', $this->ns ); ?></p>
+							<p class="description"><?php _e( '<strong>To hide this link,</strong> clear the field\'s contents.', $this->ns ); ?></p>
 						</td>
 					</tr>
 					<tr>
 						<th scope="row"><?php _e( 'CSS for print links:', $this->ns ); ?></th>
 						<td>
 							<input type="text" name="<?php echo $this->settings_key;?>[css_class]" id="css_class" value="<?php echo esc_attr( $options[ 'css_class' ] ); ?>" style="width: 40%;" />
-							<p class="description">For page-specific print links, a second class, created by appending <strong>_cur</strong> to the above text, is added to each link.</p>
-							<p class="description">Be aware that Internet Explorer will only interpret the first two CSS classes, so if multiple classes are entered above, the page-specific class may not be available in IE.</p>
+							
+							<p class="description"><?php _e( 'For page-specific print links, a second class, created by appending <strong>_cur</strong> to the above text, is added to each link.', $this->ns ); ?></p>
+							<p class="description"><?php _e( 'Be aware that Internet Explorer will only interpret the first two CSS classes, so if multiple classes are entered above, the page-specific class may not be available in IE.', $this->ns ); ?></p>
 						</td>
 					</tr>
 					<tr>
-						<th scope="row"><?php _e( 'Open print-friendly views in:', $this->ns ); ?></th>
+						<th scope="row"><?php _e( 'Open print-friendly views:', $this->ns ); ?></th>
 						<td>
 							<input type="radio" name="<?php echo $this->settings_key; ?>[link_target]" id="target-same" value="same"<?php checked( $options[ 'link_target' ], 'same', true ); ?> /> <label for="target-same"><?php _e( 'In the same window', $this->ns ); ?></label><br />
 							<input type="radio" name="<?php echo $this->settings_key; ?>[link_target]" id="target-new" value="new"<?php checked( $options[ 'link_target' ], 'new', true ); ?> /> <label for="target-new"><?php _e( 'In a new window', $this->ns ); ?></label>
+						</td>
+					</tr>
+				</table>
+				
+				<h3>Other Options</h3>
+				
+				<table class="form-table">
+					<tr>
+						<th scope="row"><?php _e( 'Include endnotes for links found in content?', $this->ns ); ?></th>
+						<td>
+							<input type="checkbox" name="<?php echo $this->settings_key; ?>[endnotes]" id="endnotes" value="1"<?php checked( $options[ 'endnotes' ], true, true ); ?> /> <label for="endnotes"><?php _e( 'Yes', $this->ns ); ?></label>
+							
+							<p class="description"><?php _e( 'If enabled, content is automatically scanned for links and an endnote is added for each link found. This can be helpful for users if your content includes many links.', $this->ns ); ?></p>
 						</td>
 					</tr>
 				</table>
@@ -477,35 +542,77 @@ class wp_print_friendly {
 	/*
 	 * Validate options
 	 * @param array $options
-	 * @uses esc_attr
+	 * @uses $this::post_types_array, sanitize_text_field
 	 * @return array
 	 */
 	function admin_options_validate( $options ) {
-		$new_options = array();
+		$new_options = array(
+			'endnotes' => false
+		);
 		
-		$new_options[ 'auto' ] = $options[ 'auto' ] == 1 ? 1 : 0;
-		
-		$placements = array( 'above', 'below', 'both' );
-		$new_options[ 'placement' ] = in_array( $options[ 'placement' ], $placements ) ? $options[ 'placement' ] : 'below';
-		
-		$post_types = $this->post_types_array();
-		$new_options[ 'post_types' ] = array();
-		foreach( $post_types as $post_type ) {
-			if( in_array( $post_type->name, $options[ 'post_types' ] ) )
-				$new_options[ 'post_types' ][] = $post_type->name;
+		if( is_array( $options ) ) {
+			foreach( $options as $key => $value ) {
+				switch( $key ) {
+					case 'auto':
+					case 'endnotes':
+						$new_options[ $key ] = (bool)$value;
+					break;
+					
+					case 'placement':
+						$placements = array(
+							'above',
+							'below',
+							'both'
+						);
+						
+						$new_options[ $key ] = in_array( $value, $placements ) ? $value : 'below';
+					break;
+					
+					case 'post_types':
+						$post_types = $this->post_types_array();
+						
+						$new_options[ $key ] = array();
+						
+						if( is_array( $value ) && is_array( $post_types ) ) {
+							foreach( $post_types as $post_type ) {
+								if( in_array( $post_type->name, $value ) )
+									$new_options[ $key ][] = $post_type->name;
+							}
+						}
+					break;
+					
+					case 'print_text':
+					case 'print_text_page':
+					case 'css_class':
+						$value = sanitize_text_field( $value );
+						
+						if( $key == 'print_text' && empty( $value ) )
+							$value = 'Print this entry';
+						
+						$new_options[ $key ] = $value;
+					break;
+					
+					case 'link_target':
+						$new_options[ $key ] = $value == 'new' ? 'new' : 'same';
+					break;
+					
+					default:
+						continue;
+					break;
+				}
+			}
 		}
 		
-		$print_text = esc_attr( $options[ 'print_text' ] );
-		$new_options[ 'print_text' ] = !empty( $print_text ) ? $print_text : 'Print this entry';
-		
-		$new_options[ 'print_text_page' ] = esc_attr( $options[ 'print_text_page' ] );
-		
-		$css_class = esc_attr( $options[ 'css_class' ] );
-		$new_options[ 'css_class' ] = !empty( $css_class ) ? $css_class : 'print_link';
-		
-		$new_options[ 'link_target' ] = $options[ 'link_target' ] == 'new' ? 'new' : 'same';
-		
 		return $new_options;
+	}
+	
+	/*
+	 * Return plugin options array parsed with default options
+	 * @uses wp_parse_args, get_option
+	 * @return array
+	 */
+	function get_options() {
+		return wp_parse_args( get_option( $this->settings_key ), $this->settings_defaults );
 	}
 	
 	/*
@@ -524,42 +631,8 @@ class wp_print_friendly {
 	}
 	
 	/*
-	 * Filter the content if automatic inclusion is selected
-	 * @param string $content
-	 * @uses get_option, apply_filters
-	 * @filter the_content
-	 * @return string
-	 */
-	function filter_the_content_auto( $content ) {
-		$options = get_option( $this->settings_key );
-				
-		if( is_array( $options ) && array_key_exists( 'auto', $options ) && $options[ 'auto' ] == 1 && !$this->is_print() ) {
-			extract( $options );
-			
-			$print_url = $this->print_url();
-			$print_url_page = $this->print_url( false, true );
-			
-			$link = '<p class="wpf_wrapper"><a class="' . $css_class . '" href="' . $print_url . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $print_text . '</a>';
-			if( !empty( $print_text_page ) ) {
-				$link .= ' | ';
-				$link .= '<a class="' . $css_class . $css_class . '_cur" href="' . $print_url_page . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $print_text_page . '</a>';
-			}
-			$link .= '</p><!-- .wpf_wrapper -->';
-			
-			if( $placement == 'above' )
-				$content = $link . $content;
-			elseif( $placement == 'below' )
-				$content = $content . $link;
-			elseif( $placement == 'both' )
-				$content = $link . $content . $link;
-		}
-		
-		return $content;
-	}
-	
-	/*
 	 * Display admin notice regarding rewrite rules flush.
-	 * @uses get_option, admin_url, add_query_arg
+	 * @uses get_option, _e, __, admin_url, add_query_arg
 	 * @action admin_notices
 	 * @return html or null
 	 */
@@ -568,13 +641,11 @@ class wp_print_friendly {
 		?>
 		
 		<div id="wpf-rewrite-flush-warning" class="error fade">
-			<p><strong>WP Print Friendly</strong></p>
-			<p>You must refresh your site's permalinks before WP Print Friendly is fully activated. To do so, go to <a href="<?php echo admin_url( 'options-permalink.php' ); ?>">Permalinks</a> and click the <strong><em>Save Changes</em></strong> button at the bottom of the screen.</p>
-			<p>When finished, click <a href="<?php
-				$base = 'index.php';
-				$url = add_query_arg( $this->notice_key, 1, $base );
-				echo admin_url( $url );
-			?>">here</a> to hide this message.</p>
+			<p><strong><?php _e( 'WP Print Friendly', $this->ns ); ?></strong></p>
+			
+			<p><?php printf( __( 'You must refresh your site\'s permalinks before WP Print Friendly is fully activated. To do so, go to <a href="%s">Permalinks</a> and click the <strong><em>Save Changes</em></strong> button at the bottom of the screen.', $this->ns ), admin_url( 'options-permalink.php' ) ); ?></p>
+			
+			<p><?php printf( __( 'When finished, click <a href="%s">here</a> to hide this message.', $this->ns ), admin_url( add_query_arg( $this->notice_key, 1, 'index.php' ) ) ); ?></p>
 		</div>
 		
 		<?php
