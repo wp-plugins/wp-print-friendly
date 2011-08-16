@@ -4,7 +4,7 @@ Plugin Name: WP Print Friendly
 Plugin URI: http://www.thinkoomph.com/plugins-modules/wp-print-friendly/
 Description: Extends WordPress' template system to support printer-friendly templates. Works with permalink structures to support nice URLs.
 Author: Erick Hitter (Oomph, Inc.)
-Version: 0.4.1
+Version: 0.4.2
 Author URI: http://www.thinkoomph.com/
 */
 
@@ -198,17 +198,40 @@ class wp_print_friendly {
 	
 	/*
 	 * Add print rewrite rules for pages
+	 *
+	 * For permalink structures starting with %postname%, verbose rules are required, meaning rules specific to each page are generated.
+	 *
 	 * @param array $rules
 	 * @return array
 	 */
 	function filter_page_rewrite_rules( $rules ) {
 		global $wp_rewrite;
 		
-		$page_rules = array(
-			'(.+?)/print(/[0-9]+)?/?$' => $wp_rewrite->index . '?pagename=$matches[1]&print=$matches[2]'
-		);
+		//Build rules based on permalink structure and position of %postname% if present
+		if( stripos( $wp_rewrite->permalink_structure, '/%postname%' ) === 0 ) {
+			$page_rules = $_page_rules_first = $_page_rules_last = array();
+			
+			$uris = $wp_rewrite->page_uri_index();
+			$uris = is_array( $uris ) && array_key_exists( 0, $uris ) && is_array( $uris[ 0 ] ) && !empty( $uris[ 0 ] ) ? $uris[ 0 ] : array( '' => '' );
+			
+			foreach( $uris as $uri => $page_id ) {
+				$_page_rules_first[ $uri . '/print(/[0-9]+)?/?$' ] = $wp_rewrite->index . '?pagename=' . $uri . '&print=$matches[1]';
+				$_page_rules_last[ '(' . $uri . ')/print(/[0-9]+)?/?$' ] = $wp_rewrite->index . '?pagename=$matches[1]&print=$matches[2]';
+			}
+			
+			if( !empty( $_page_rules_first ) )
+				$page_rules = array_merge( $page_rules, $_page_rules_first );
+			if( !empty( $_page_rules_last ) )
+				$page_rules = array_merge( $page_rules, $_page_rules_last );
+		}
+		else
+			$page_rules = array(
+				'(.+?)/print(/[0-9]+)?/?$' => $wp_rewrite->index . '?pagename=$matches[1]&print=$matches[2]'
+			);
 		
-		$rules = array_merge( $page_rules, $rules );
+		//Merge additional rules, if any
+		if( isset( $page_rules ) && is_array( $page_rules ) && !empty( $page_rules ) )
+			$rules = array_merge( $page_rules, $rules );
 		
 		return $rules;
 	}

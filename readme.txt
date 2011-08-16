@@ -4,7 +4,7 @@ Donate link: http://www.thinkoomph.com/plugins-modules/wp-print-friendly/
 Tags: print, template, printer, printable
 Requires at least: 3.1
 Tested up to: 3.2.1
-Stable tag: 0.4.1
+Stable tag: 0.4.2
 
 Extends WordPress' template system to support printer-friendly templates. Works with permalink structures to support nice URLs.
 
@@ -37,6 +37,9 @@ The function `wpf_the_print_link` will add a link to the print-friendly version 
 
 == Changelog ==
 
+= 0.4.2 =
+* Correct page rewrite rules to accomodate situations necessitating verbose rules, such as when the permalink structure starts with %postname%.
+
 = 0.4.1 =
 * Fix bug that displayed post links automatically on the wrong post types.
 
@@ -61,6 +64,12 @@ The function `wpf_the_print_link` will add a link to the print-friendly version 
 * Initial version.
 
 == Upgrade Notice ==
+
+= 0.4.2 =
+This release expands the plugin's page rewrite rules to accomodate permalink structures that necessitate verbose rules, such as when the structure begins with %postname%.
+
+= 0.4.1 =
+This release fixes bug that displayed post links automatically on the wrong post types.
 
 = 0.4 =
 This release addresses numerous bugs reported by the community, including print templates for child pages. All admin text, save the plugin's name, are now ready for translation. Templates are now completely customizable, and new template functions are included.
