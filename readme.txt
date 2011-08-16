@@ -41,7 +41,7 @@ The function `wpf_the_print_link` will add a link to the print-friendly version 
 * Version 0.4.2 omitted the default template.
 
 = 0.4.2 =
-* Correct page rewrite rules to accomodate situations necessitating verbose rules, such as when the permalink structure starts with %postname%.
+* Correct page rewrite rules to accomodate situations necessitating verbose rules, such as when the permalink structure starts with %postname%. Thanks to Wes Herzik at ikonic for discovering and reporting this issue.
 
 = 0.4.1 =
 * Fix bug that displayed post links automatically on the wrong post types.
