@@ -53,7 +53,7 @@ This plugin is known to conflict with certain plugins, many pertaining to SEO an
 * Version 0.4.2 omitted the default template.
 
 = 0.4.2 =
-* Correct page rewrite rules to accomodate situations necessitating verbose rules, such as when the permalink structure starts with %postname%. Thanks to Wes Herzik at ikonic for discovering and reporting this issue.
+* Correct page rewrite rules to accomodate situations necessitating verbose rules, such as when the permalink structure starts with `%postname%`. Thanks to Wes Herzik at ikonic for discovering and reporting this issue.
 
 = 0.4.1 =
 * Fix bug that displayed post links automatically on the wrong post types.
@@ -73,7 +73,7 @@ This plugin is known to conflict with certain plugins, many pertaining to SEO an
 * Add option to open print-friendly views in a new window.
 
 = 0.3.1 =
-* Correct PHP error in is_print().
+* Correct PHP error in `is_print()`.
 
 = 0.3 =
 * Initial version.
@@ -84,7 +84,7 @@ This plugin is known to conflict with certain plugins, many pertaining to SEO an
 Version 0.4.2 omitted the default template.
 
 = 0.4.2 =
-This release expands the plugin's page rewrite rules to accomodate permalink structures that necessitate verbose rules, such as when the structure begins with %postname%.
+This release expands the plugin's page rewrite rules to accomodate permalink structures that necessitate verbose rules, such as when the structure begins with `%postname%`.
 
 = 0.4.1 =
 This release fixes bug that displayed post links automatically on the wrong post types.
