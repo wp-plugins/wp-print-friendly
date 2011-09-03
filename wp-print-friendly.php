@@ -4,7 +4,7 @@ Plugin Name: WP Print Friendly
 Plugin URI: http://www.thinkoomph.com/plugins-modules/wp-print-friendly/
 Description: Extends WordPress' template system to support printer-friendly templates. Works with permalink structures to support nice URLs.
 Author: Erick Hitter (Oomph, Inc.)
-Version: 0.4.3.1
+Version: 0.4.3.2
 Author URI: http://www.thinkoomph.com/
 */
 
@@ -440,12 +440,15 @@ class wp_print_friendly {
 	 * Generate URL for post's printer-friendly format
 	 * @param int $post_id
 	 * @param int $page
-	 * @uses is_home, is_front_page, home_url, $post, get_permalink, is_category, get_category_link, is_tag, get_tag_link, is_date, get_query_var, get_day_link, get_month_link, get_year_link, is_tax, get_queried_object, get_term_link, $wp_rewrite, path_join, trailingslashit, add_query_arg
+	 * @uses is_view_all, is_home, is_front_page, home_url, $post, get_permalink, is_category, get_category_link, is_tag, get_tag_link, is_date, get_query_var, get_day_link, get_month_link, get_year_link, is_tax, get_queried_object, get_term_link, $wp_rewrite, path_join, trailingslashit, add_query_arg
 	 * @return string or bool
 	 */
 	function print_url( $post_id = false, $page = false ) {
 		if( $page === true )
 			return false;
+		
+		if( function_exists( 'is_view_all' ) && is_view_all() )
+			$page = false;
 		
 		$link = false;
 		
@@ -709,7 +712,7 @@ class wp_print_friendly {
 	 * @return array
 	 */
 	function get_options() {
-		$options = get_option( $this->settings_key );
+		$options = get_option( $this->settings_key, $this->settings_defaults );
 		
 		if( !array_key_exists( 'post_types', $options ) )
 			$options[ 'post_types' ] = array();
