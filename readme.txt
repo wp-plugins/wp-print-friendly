@@ -4,7 +4,7 @@ Donate link: http://www.thinkoomph.com/plugins-modules/wp-print-friendly/
 Tags: print, template, printer, printable
 Requires at least: 3.1
 Tested up to: 3.2.1
-Stable tag: 0.4.2.2
+Stable tag: 0.4.3
 
 Extends WordPress' template system to support printer-friendly templates. Works with permalink structures to support nice URLs.
 
@@ -49,6 +49,13 @@ This plugin is known to conflict with certain plugins, many pertaining to SEO an
 
 == Changelog ==
 
+= 0.4.3 =
+* Fix bug in page number function.
+* Rewrite endnote link processing, including a refined regex pattern.
+* Introduce class property for print slug.
+* Correct minor bug in print link generation.
+* Add canonical link attribute and nofollow declaration to default template.
+
 = 0.4.2.2 =
 * Correct generation of custom post type rewrite rules.
 
@@ -82,6 +89,9 @@ This plugin is known to conflict with certain plugins, many pertaining to SEO an
 * Initial version.
 
 == Upgrade Notice ==
+
+= 0.4.3 =
+Fixes various bugs in the print link, page numbering, and endnote generating functions. Also introduces a class variable for permalink component. Default template is updated to be more SEO friendly, now containing both canonical URL and nofollow declarations.
 
 = 0.4.2.2 =
 Rewrite rules for custom post types are now generated correctly.

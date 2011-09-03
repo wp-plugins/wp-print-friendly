@@ -4,11 +4,13 @@ Plugin Name: WP Print Friendly
 Plugin URI: http://www.thinkoomph.com/plugins-modules/wp-print-friendly/
 Description: Extends WordPress' template system to support printer-friendly templates. Works with permalink structures to support nice URLs.
 Author: Erick Hitter (Oomph, Inc.)
-Version: 0.4.2.2
+Version: 0.4.3
 Author URI: http://www.thinkoomph.com/
 */
 
 class wp_print_friendly {
+	var $query_var = 'print';
+	
 	var $ns = 'wp_print_friendly';
 	
 	var $settings_key = 'wpf';
@@ -84,7 +86,7 @@ class wp_print_friendly {
 		
 		if( $wp_rewrite->permalink_structure ) {
 			//Posts
-			add_rewrite_endpoint( 'print', 9999 );
+			add_rewrite_endpoint( $this->query_var, 9999 );
 			
 			//Custom post types
 			$post_types = get_post_types( array( '_builtin' => false ), 'objects' );
@@ -96,7 +98,7 @@ class wp_print_friendly {
 				if( $post_type->rewrite[ 'with_front' ] && $wp_rewrite->front != '/' ) $post_type_slug .= $wp_rewrite->front;
 				$post_type_slug .= $post_type->rewrite[ 'slug' ];
 				
-				add_rewrite_rule( $post_type_slug . '/([^/]+)(/[0-9]+)?/print(/(.*))?/?$', $wp_rewrite->index . '?' . $post_type->query_var . '=$matches[1]&page=$matches[2]&print=$matches[3]', 'top' );
+				add_rewrite_rule( $post_type_slug . '/([^/]+)(/[0-9]+)?/' . $this->query_var . '(/(.*))?/?$', $wp_rewrite->index . '?' . $post_type->query_var . '=$matches[1]&page=$matches[2]&' . $this->query_var . '=$matches[3]', 'top' );
 			}
 			
 			//Taxonomies
@@ -111,7 +113,7 @@ class wp_print_friendly {
 				
 				$query_var = $args->query_var ? $args->query_var : 'taxonomy=' . $taxonomy . '&term';
 				
-				add_rewrite_rule( $taxonomy_slug . '/([^/]+)?/print(/(.*))?/?$', $wp_rewrite->index . '?' . $query_var . '=$matches[1]&print=$matches[2]', 'top' );
+				add_rewrite_rule( $taxonomy_slug . '/([^/]+)?/' . $this->query_var . '(/(.*))?/?$', $wp_rewrite->index . '?' . $query_var . '=$matches[1]&' . $this->query_var . '=$matches[2]', 'top' );
 			}
 			
 			//Pages - now handled via $this::filter_page_rewrite_rules() to prevent their generality from conflicting with other rewrite rules.
@@ -138,7 +140,7 @@ class wp_print_friendly {
 	 */
 	function is_print() {
 		global $wp_query;
-		return is_array( $wp_query->query ) && array_key_exists( 'print', $wp_query->query );
+		return is_array( $wp_query->query ) && array_key_exists( $this->query_var, $wp_query->query );
 	}
 	
 	/*
@@ -191,7 +193,7 @@ class wp_print_friendly {
 	 * @return array
 	 */
 	function filter_query_vars( $query_vars ) {
-		$query_vars[] = 'print';
+		$query_vars[] = $this->query_var;
 	
 		return $query_vars;
 	}
@@ -215,8 +217,8 @@ class wp_print_friendly {
 			$uris = is_array( $uris ) && array_key_exists( 0, $uris ) && is_array( $uris[ 0 ] ) && !empty( $uris[ 0 ] ) ? $uris[ 0 ] : array( '' => '' );
 			
 			foreach( $uris as $uri => $page_id ) {
-				$_page_rules_first[ $uri . '/print(/[0-9]+)?/?$' ] = $wp_rewrite->index . '?pagename=' . $uri . '&print=$matches[1]';
-				$_page_rules_last[ '(' . $uri . ')/print(/[0-9]+)?/?$' ] = $wp_rewrite->index . '?pagename=$matches[1]&print=$matches[2]';
+				$_page_rules_first[ $uri . '/' . $this->query_var . '(/[0-9]+)?/?$' ] = $wp_rewrite->index . '?pagename=' . $uri . '&' . $this->query_var . '=$matches[1]';
+				$_page_rules_last[ '(' . $uri . ')/' . $this->query_var . '(/[0-9]+)?/?$' ] = $wp_rewrite->index . '?pagename=$matches[1]&' . $this->query_var . '=$matches[2]';
 			}
 			
 			if( !empty( $_page_rules_first ) )
@@ -226,7 +228,7 @@ class wp_print_friendly {
 		}
 		else
 			$page_rules = array(
-				'(.+?)/print(/[0-9]+)?/?$' => $wp_rewrite->index . '?pagename=$matches[1]&print=$matches[2]'
+				'(.+?)/' . $this->query_var . '(/[0-9]+)?/?$' => $wp_rewrite->index . '?pagename=$matches[1]&' . $this->query_var . '=$matches[2]'
 			);
 		
 		//Merge additional rules, if any
@@ -243,8 +245,8 @@ class wp_print_friendly {
 	 * @return array
 	 */
 	function filter_request( $qv ) {
-		if( array_key_exists( 'pagename', $qv ) && $qv[ 'pagename' ] == 'print' ) {
-			$qv[ 'print' ] = '';
+		if( array_key_exists( 'pagename', $qv ) && $qv[ 'pagename' ] == $this->query_var ) {
+			$qv[ $this->query_var ] = '';
 			unset( $qv[ 'page' ] );
 			unset( $qv[ 'pagename' ] );
 		}
@@ -259,8 +261,8 @@ class wp_print_friendly {
 	 * @return object
 	 */
 	function action_pre_get_posts( $query ) {
-		if( array_key_exists( 'print', $query->query_vars ) && !empty( $query->query_vars[ 'print' ] ) ) {
-			$qv = explode( '/', $query->query_vars[ 'print' ] );
+		if( array_key_exists( $this->query_var, $query->query_vars ) && !empty( $query->query_vars[ $this->query_var ] ) ) {
+			$qv = explode( '/', $query->query_vars[ $this->query_var ] );
 			
 			if( is_numeric( $qv[ 1 ] ) )
 				$query->query_vars[ 'page' ] = (int)$qv[ 1 ];
@@ -308,7 +310,7 @@ class wp_print_friendly {
 	 */
 	function filter_the_content( $content ) {
 		if( $this->is_print() ) {
-			$print = get_query_var( 'print' );
+			$print = get_query_var( $this->query_var );
 			
 			if( $print == 'all' || $print == '/all' || empty( $print ) ) {
 				global $post;
@@ -391,14 +393,27 @@ class wp_print_friendly {
 				$i = 1;
 				
 				//Build array of links
-				preg_match_all( '/<a(.*?)href=["\'](.*?)["\']>(.*?)<\/a>/i', $content, $matches );
+				preg_match_all( '#<a href=(["\'{1}])([^"\']+)(["\'{1}])([^>]*)>(.*?)</a>#i', $content, $matches );
 				
-				if( !empty( $matches[ 0 ] ) && !empty( $matches[ 1 ] ) && !empty( $matches[ 2 ] ) && !empty( $matches[ 3 ] ) ) {
-					//Replace links with endnote markers
+				if(
+					isset( $matches ) && is_array( $matches ) &&
+					array_key_exists( 0, $matches ) && !empty( $matches[ 0 ] ) &&
+					array_key_exists( 2, $matches ) && !empty( $matches[ 2 ] ) &&
+					array_key_exists( 5, $matches ) && !empty( $matches[ 5 ] )
+				) {
+					//Format matches for replacement in content
+					$replacements = array();
 					foreach( $matches[ 0 ] as $key => $match ) {
-						$content = str_replace( $match, $matches[ 3 ][ $key ] . '[' . $i . ']', $content );
-						$links[ $i ][ 'title' ] = $matches[ 3 ][ $key ];
-						$links[ $i ][ 'url' ] = $matches[ 2 ][ $key ];
+						$replacements[ $match ] = array(
+							'url' => $matches[ 2 ][ $key ],
+							'title' => $matches[ 5 ][ $key ]
+						);
+					}
+					
+					//Replace links with endnote markers
+					foreach( $replacements as $match => $args ) {
+						$content = str_replace( $match, $args[ 'title' ] . '[' . $i . ']', $content );
+						$links[ $i ] = $args;
 						$i++;
 					}
 					
@@ -436,7 +451,7 @@ class wp_print_friendly {
 		
 		//Get link base specific to page type being viewed
 		if( is_singular() || in_the_loop() ) {
-			if( $post_id === false ) {
+			if( $post_id == false ) {
 				global $post;
 				$post_id = $post->ID;
 			}
@@ -479,7 +494,7 @@ class wp_print_friendly {
 			$page = intval( $page );
 			
 			if( $wp_rewrite->using_permalinks() ) {
-				$link = path_join( $link, 'print' );
+				$link = path_join( $link, $this->query_var );
 				
 				if( $page )
 					$link = path_join( $link, intval( $page ) );
@@ -488,7 +503,7 @@ class wp_print_friendly {
 					$link = trailingslashit( $link );
 			}
 			else {
-				$link = add_query_arg( 'print', is_numeric( $page ) ? intval( $page ) : 'all', $link );
+				$link = add_query_arg( $this->query_var, is_numeric( $page ) ? intval( $page ) : 'all', $link );
 				
 				if( $page )
 					$link = add_query_arg( 'page', is_numeric( $page ) ? intval( $page ) : 'all', $link );
@@ -748,7 +763,7 @@ class wp_print_friendly {
 			return false;
 		
 		//Don't display on views that include all pages of a post
-		$print = get_query_var( 'print' );
+		$print = get_query_var( $this->query_var );
 		if( $print == 'all' || $print == '/all' || empty( $print ) )
 			return false;
 		
@@ -773,7 +788,7 @@ class wp_print_friendly {
 			return false;
 		
 		//Get current page
-		$page = get_query_var( 'page' );
+		$page = get_query_var( $this->query_var );
 		$page = $page ? $page : 1;
 		
 		//Get total number of pages, or return false if total cannot be determined
@@ -802,7 +817,7 @@ function wpf_get_print_url( $post_id = false, $page = false ) {
 	global $wpf;
 	if( !is_a( $wpf, 'wp_print_friendly' ) )
 		$wpf = new wp_print_friendly;
-		
+	
 	return $wpf->print_url( intval( $post_id ), intval( $page ) );
 }
 

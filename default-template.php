@@ -2,6 +2,8 @@
 <html>
 	<head>
 		<title><?php wp_title( '|', true, 'right' ); bloginfo( 'name' ); ?></title>
+		<link rel="canonical" href="<?php the_permalink(); ?>" />
+		<meta name="robots" content="noindex" />
 	</head>
 	<body <?php body_class(); ?>>
 	
