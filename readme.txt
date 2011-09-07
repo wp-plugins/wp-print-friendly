@@ -4,7 +4,7 @@ Donate link: http://www.thinkoomph.com/plugins-modules/wp-print-friendly/
 Tags: print, template, printer, printable
 Requires at least: 3.1
 Tested up to: 3.2.1
-Stable tag: 0.4.3.2
+Stable tag: 0.4.3.3
 
 Extends WordPress' template system to support printer-friendly templates. Works with permalink structures to support nice URLs.
 
@@ -48,6 +48,11 @@ This plugin is known to conflict with certain plugins, many pertaining to SEO an
 * **WordPress SEO by Yoast:** This plugin's `Permalink` options, particularly *Redirect attachment URL's to parent post URL* and *Redirect ugly URL's to clean permalinks. (Not recommended in many cases!)*, interfere with WP Print Friendly's ability to display print templates. Both must be disabled, and the site's rewrite rules regenerated (by visiting Options > Permalinks and clicking *Save Changes*), for WP Print Friendly to function.
 
 == Changelog ==
+
+= 0.4.3.3 =
+* Correct error that would display wrong page's content when printing a single page of a paged post.
+* Correct error in link generation for page-specific print links.
+* Increase compatibility with View All Post's Pages plugin.
 
 = 0.4.3.2 =
 * Resolve PHP notice in options retrieval.
@@ -97,6 +102,9 @@ This plugin is known to conflict with certain plugins, many pertaining to SEO an
 * Initial version.
 
 == Upgrade Notice ==
+
+= 0.4.3.3 =
+Corrects a few errors related to paged posts and further enhances compatibility with View All Post's Pages plugin.
 
 = 0.4.3.2 =
 Fixes a minor bug in plugin's options retrieval and enhances compatibility with forthcoming View All Post's Pages plugin.

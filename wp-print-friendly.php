@@ -4,7 +4,7 @@ Plugin Name: WP Print Friendly
 Plugin URI: http://www.thinkoomph.com/plugins-modules/wp-print-friendly/
 Description: Extends WordPress' template system to support printer-friendly templates. Works with permalink structures to support nice URLs.
 Author: Erick Hitter (Oomph, Inc.)
-Version: 0.4.3.2
+Version: 0.4.3.3
 Author URI: http://www.thinkoomph.com/
 */
 
@@ -250,6 +250,9 @@ class wp_print_friendly {
 			unset( $qv[ 'page' ] );
 			unset( $qv[ 'pagename' ] );
 		}
+		
+		if( array_key_exists( $this->query_var, $qv ) && is_numeric( $qv[ $this->query_var ] ) )
+			$qv[ 'page' ] = intval( $qv[ $this->query_var ] );
 		
 		return $qv;
 	}
@@ -847,12 +850,15 @@ function wpf_the_print_link( $page_link = false, $link_text = 'Print this post',
 	
 	$page_link = (bool)$page_link;
 	
+	if( function_exists( 'is_view_all' ) && is_view_all() )
+		$page_link = false;
+	
 	if( $url ) {
 		$link = '<a ' . ( $class ? 'class="' . esc_attr( $class ) . '"' : '' ) . ' href="' . esc_url( $url ) . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $link_text . '</a>';
 		
 		if( $page_link && strpos( $post->post_content, '<!--nextpage-->' ) !== false ) {
 			$page = get_query_var( 'page' );
-			$page = $page ? $page : 0;
+			$page = $page ? $page : 1;
 			$link .= $page_link_separator . '<a ' . ( $class ? 'class="' . esc_attr( $class ) . '_cur ' . esc_attr( $class ) . '"' : '' ) . ' href="' . esc_url( wpf_get_print_url( $post->ID, $page ) ) . '"' . ( $link_target == 'new' ? ' target="_blank"' : '' ) . '>' . $page_link_text . '</a>';
 		}
 		
