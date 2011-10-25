@@ -4,7 +4,7 @@ Donate link: http://www.thinkoomph.com/plugins-modules/wp-print-friendly/
 Tags: print, template, printer, printable
 Requires at least: 3.1
 Tested up to: 3.2.1
-Stable tag: 0.4.3.3
+Stable tag: 0.4.4
 
 Extends WordPress' template system to support printer-friendly templates. Works with permalink structures to support nice URLs.
 
@@ -30,7 +30,15 @@ If clicking on a print link takes you back to the post or page where the link ap
 If, after reviewing the remaining FAQ, you are still experiencing problems, visit [http://www.thinkoomph.com/plugins-modules/wp-print-friendly/](http://www.thinkoomph.com/plugins-modules/wp-print-friendly/) and leave a comment detailing the problem.
 
 = How should I name print templates? =
-Print templates should be prefixed with *wpf* and follow WordPress template conventions from there. To use one template for all contexts unless otherwise specified, name your template *wpf.php.* For custom post types, *wpf-[post type name].php* will be used for that post type. Similarly, *wpf-home.php* will load that template for the front page of your site. The plugin includes a default template that may suit many needs.
+Print templates should be prefixed with *wpf* and follow WordPress template conventions from there. To use one template for all contexts unless otherwise specified, name your template *wpf.php.*
+
+For both built-in and custom post types, *wpf-[post type name].php* will be used for that post type. To use a template for a single post type object, name your template *wpf-[post type name]-[slug].php*.
+
+For custom taxonomies, follow the naming conventions for post types.
+
+Similarly, *wpf-home.php* will load that template for the front page of your site.
+
+The plugin also includes a default template that may suit many needs.
 
 = How do I add a print link to my templates? =
 The function `wpf_the_print_link` will add a link to the print-friendly version of whatever page it appears on. This function accepts the following arguments:
@@ -48,6 +56,11 @@ This plugin is known to conflict with certain plugins, many pertaining to SEO an
 * **WordPress SEO by Yoast:** This plugin's `Permalink` options, particularly *Redirect attachment URL's to parent post URL* and *Redirect ugly URL's to clean permalinks. (Not recommended in many cases!)*, interfere with WP Print Friendly's ability to display print templates. Both must be disabled, and the site's rewrite rules regenerated (by visiting Options > Permalinks and clicking *Save Changes*), for WP Print Friendly to function.
 
 == Changelog ==
+
+= 0.4.4 =
+* Full support for child themes.
+* Expand template choosing to fully support WordPress template hierarchy as described at [http://codex.wordpress.org/Template_Hierarchy](http://codex.wordpress.org/Template_Hierarchy).
+* Simplify rewrite rules creation.
 
 = 0.4.3.3 =
 * Correct error that would display wrong page's content when printing a single page of a paged post.
@@ -102,6 +115,9 @@ This plugin is known to conflict with certain plugins, many pertaining to SEO an
 * Initial version.
 
 == Upgrade Notice ==
+
+= 0.4.4 =
+Adds full child theme and template hierarchy support for template selection. Simplifies rewrite rules.
 
 = 0.4.3.3 =
 Corrects a few errors related to paged posts and further enhances compatibility with View All Post's Pages plugin.

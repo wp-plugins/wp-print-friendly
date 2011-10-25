@@ -4,7 +4,7 @@ Plugin Name: WP Print Friendly
 Plugin URI: http://www.thinkoomph.com/plugins-modules/wp-print-friendly/
 Description: Extends WordPress' template system to support printer-friendly templates. Works with permalink structures to support nice URLs.
 Author: Erick Hitter (Oomph, Inc.)
-Version: 0.4.3.3
+Version: 0.4.4
 Author URI: http://www.thinkoomph.com/
 */
 
@@ -58,11 +58,10 @@ class wp_print_friendly {
 	 * @return null
 	 */
 	function action_plugins_loaded() {
-		add_action( 'delete_option_rewrite_rules', array( $this, 'action_delete_option_rewrite_rules' ), 999 );
+		add_action( 'init', array( $this, 'action_init' ), 20 );
 		add_action( 'admin_init', array( $this, 'action_admin_init' ) );
 		add_action( 'admin_menu', array( $this, 'action_admin_menu' ) );
 		add_filter( 'query_vars', array( $this, 'filter_query_vars' ) );
-		add_filter( 'page_rewrite_rules', array( $this, 'filter_page_rewrite_rules' ), 99 );
 		add_filter( 'request', array( $this, 'filter_request' ) );
 		add_action( 'pre_get_posts', array( $this, 'action_pre_get_posts' ) );
 		add_filter( 'template_include', array( $this, 'filter_template_include' ) );
@@ -76,32 +75,17 @@ class wp_print_friendly {
 	}
 	
 	/*
-	 * Add print rewrite rules if not using default permalinks.
-	 * @uses $wp_rewrite, add_rewrite_endpoint, get_post_types, add_rewrite_rule, get_taxonomies
+	 * Add print endpoint and rewrite rules for term taxonomy archives
+	 * @uses add_rewrite_endpoint, $wp_rewrite, get_taxonomies, add_rewrite_rule
 	 * @action init
 	 * @return null
 	 */
-	function action_delete_option_rewrite_rules() {
-		global $wp_rewrite;
+	function action_init() {
+		add_rewrite_endpoint( $this->query_var, EP_ALL );
 		
+		//Taxonomies, since they aren't covered by add_rewrite_endpoint
+		global $wp_rewrite;
 		if( $wp_rewrite->permalink_structure ) {
-			//Posts
-			add_rewrite_endpoint( $this->query_var, 9999 );
-			
-			//Custom post types
-			$post_types = get_post_types( array( '_builtin' => false ), 'objects' );
-			foreach( $post_types as $post_type ) {
-				if( !is_object( $post_type ) || !property_exists( $post_type, 'rewrite' ) || $post_type->rewrite == false )
-					continue;
-				
-				$post_type_slug = '';
-				if( $post_type->rewrite[ 'with_front' ] && $wp_rewrite->front != '/' ) $post_type_slug .= $wp_rewrite->front;
-				$post_type_slug .= $post_type->rewrite[ 'slug' ];
-				
-				add_rewrite_rule( $post_type_slug . '/([^/]+)(/[0-9]+)?/' . $this->query_var . '(/(.*))?/?$', $wp_rewrite->index . '?' . $post_type->query_var . '=$matches[1]&page=$matches[2]&' . $this->query_var . '=$matches[3]', 'top' );
-			}
-			
-			//Taxonomies
 			$taxonomies = get_taxonomies( array(), 'objects' );
 			foreach( $taxonomies as $taxonomy => $args ) {
 				if( $args->rewrite == false )
@@ -115,8 +99,6 @@ class wp_print_friendly {
 				
 				add_rewrite_rule( $taxonomy_slug . '/([^/]+)?/' . $this->query_var . '(/(.*))?/?$', $wp_rewrite->index . '?' . $query_var . '=$matches[1]&' . $this->query_var . '=$matches[2]', 'top' );
 			}
-			
-			//Pages - now handled via $this::filter_page_rewrite_rules() to prevent their generality from conflicting with other rewrite rules.
 		}
 	}
 	
@@ -146,7 +128,7 @@ class wp_print_friendly {
 	/*
 	 * Select appropriate template based on post type and available templates.
 	 * Returns an array with name and path keys for available template or false if no template is found.
-	 * @uses get_queried_object, is_home, is_front_page, TEMPLATEPATH
+	 * @uses get_queried_object, is_home, is_front_page, locate_template
 	 * @return array or false
 	 */
 	function template_chooser() {
@@ -156,26 +138,45 @@ class wp_print_friendly {
 		//Get plugin path
 		$pluginpath = dirname( __FILE__ );
 		
-		if( ( is_home() || is_front_page() ) && file_exists( TEMPLATEPATH . '/wpf-home.php' ) ) {
+		if( ( is_home() || is_front_page() ) && ( '' !== ( $path = locate_template( 'wpf-home.php', false ) ) ) ) {
 			$template = array(
 				'name' => 'wpf-home',
-				'path' => TEMPLATEPATH . '/wpf-home.php'
+				'path' => $path
 			);
 		}
-		elseif( is_object( $queried_object ) && property_exists( $queried_object, 'taxonomy' ) && file_exists( TEMPLATEPATH . '/wpf-' . $queried_object->taxonomy . '.php' ) )
+		elseif(
+			is_object( $queried_object ) &&
+			property_exists( $queried_object, 'taxonomy' ) &&
+			property_exists( $queried_object, 'slug' ) &&
+			( '' !== ( $path = locate_template( array( 'wpf-' . $queried_object->taxonomy . '-' . $queried_object->slug . '.php', 'wpf-' . $queried_object->taxonomy . '.php' ), false ) ) ) 
+		)
 			$template = array(
 				'name' => 'wpf-' . $queried_object->taxonomy,
-				'path' => TEMPLATEPATH . '/wpf-' . $queried_object->taxonomy . '.php'
+				'path' => $path
 			);
-		elseif( is_object( $queried_object ) && property_exists( $queried_object, 'post_type' ) && file_exists( TEMPLATEPATH . '/wpf-' . $queried_object->post_type . '.php' ) )
+		elseif(
+			is_object( $queried_object ) &&
+			property_exists( $queried_object, 'post_type' ) &&
+			property_exists( $queried_object, 'post_name' ) &&
+			( '' !== ( $path = locate_template( array( 'wpf-' . $queried_object->post_type . '-' . $queried_object->post_name . '.php', 'wpf-' . $queried_object->post_type . '.php' ), false ) ) )
+		)
 			$template = array(
 				'name' => 'wpf-' . $queried_object->post_type,
-				'path' => TEMPLATEPATH . '/wpf-' . $queried_object->post_type . '.php'
+				'path' => $path
 			);
-		elseif( file_exists( TEMPLATEPATH . '/wpf.php' ) )
+		elseif(
+			is_object( $queried_object ) &&
+			property_exists( $queried_object, 'post_name' ) &&
+			( '' !== ( $path = locate_template( 'wpf-' . $queried_object->post_name . '.php', false ) ) )
+		)
+			$template = array(
+				'name' => 'wpf-' . $queried_object->post_name,
+				'path' => $path
+			);
+		elseif( '' !== ( $path = locate_template( 'wpf.php', false ) ) )
 			$template = array(
 				'name' => 'wpf-default',
-				'path' => TEMPLATEPATH . '/wpf.php'
+				'path' => $path
 			);
 		elseif( file_exists( $pluginpath . '/default-template.php' ) )
 			$template = array(
@@ -196,46 +197,6 @@ class wp_print_friendly {
 		$query_vars[] = $this->query_var;
 	
 		return $query_vars;
-	}
-	
-	/*
-	 * Add print rewrite rules for pages
-	 *
-	 * For permalink structures starting with %postname%, verbose rules are required, meaning rules specific to each page are generated.
-	 *
-	 * @param array $rules
-	 * @return array
-	 */
-	function filter_page_rewrite_rules( $rules ) {
-		global $wp_rewrite;
-		
-		//Build rules based on permalink structure and position of %postname% if present
-		if( stripos( $wp_rewrite->permalink_structure, '/%postname%' ) === 0 ) {
-			$page_rules = $_page_rules_first = $_page_rules_last = array();
-			
-			$uris = $wp_rewrite->page_uri_index();
-			$uris = is_array( $uris ) && array_key_exists( 0, $uris ) && is_array( $uris[ 0 ] ) && !empty( $uris[ 0 ] ) ? $uris[ 0 ] : array( '' => '' );
-			
-			foreach( $uris as $uri => $page_id ) {
-				$_page_rules_first[ $uri . '/' . $this->query_var . '(/[0-9]+)?/?$' ] = $wp_rewrite->index . '?pagename=' . $uri . '&' . $this->query_var . '=$matches[1]';
-				$_page_rules_last[ '(' . $uri . ')/' . $this->query_var . '(/[0-9]+)?/?$' ] = $wp_rewrite->index . '?pagename=$matches[1]&' . $this->query_var . '=$matches[2]';
-			}
-			
-			if( !empty( $_page_rules_first ) )
-				$page_rules = array_merge( $page_rules, $_page_rules_first );
-			if( !empty( $_page_rules_last ) )
-				$page_rules = array_merge( $page_rules, $_page_rules_last );
-		}
-		else
-			$page_rules = array(
-				'(.+?)/' . $this->query_var . '(/[0-9]+)?/?$' => $wp_rewrite->index . '?pagename=$matches[1]&' . $this->query_var . '=$matches[2]'
-			);
-		
-		//Merge additional rules, if any
-		if( isset( $page_rules ) && is_array( $page_rules ) && !empty( $page_rules ) )
-			$rules = array_merge( $page_rules, $rules );
-		
-		return $rules;
 	}
 	
 	/*
