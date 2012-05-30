@@ -96,7 +96,7 @@ class wp_print_friendly {
 
 				$query_var = $args->query_var ? $args->query_var : 'taxonomy=' . $taxonomy . '&term';
 
-				add_rewrite_rule( $taxonomy_slug . '/(.*?)/' . $this->query_var . '(/([0-9]*))?/?$', $wp_rewrite->index . '?' . $query_var . '=$matches[1]&' . $this->query_var . '=$matches[3]', 'top' );
+				add_rewrite_rule( $taxonomy_slug . '/(.+)/' . $this->query_var . '(/([0-9]*))?/?$', $wp_rewrite->index . '?' . $query_var . '=$matches[1]&' . $this->query_var . '=$matches[3]', 'top' );
 			}
 		}
 	}
