@@ -82,8 +82,9 @@ class wp_print_friendly {
 	function action_init() {
 		add_rewrite_endpoint( $this->query_var, EP_ALL );
 
-		//Taxonomies, since they aren't covered by add_rewrite_endpoint
 		global $wp_rewrite;
+
+		//Taxonomies, since they aren't covered by add_rewrite_endpoint
 		if( $wp_rewrite->permalink_structure ) {
 			$taxonomies = get_taxonomies( array(), 'objects' );
 			foreach( $taxonomies as $taxonomy => $args ) {
@@ -98,6 +99,15 @@ class wp_print_friendly {
 
 				add_rewrite_rule( $taxonomy_slug . '/(.+)/' . $this->query_var . '(/([0-9]*))?/?$', $wp_rewrite->index . '?' . $query_var . '=$matches[1]&' . $this->query_var . '=$matches[3]', 'top' );
 			}
+		}
+
+		//Extra rules needed if verbose page rules are requested
+		if ( $wp_rewrite->use_verbose_page_rules ) {
+			$regex = substr( str_replace( $wp_rewrite->rewritecode, $wp_rewrite->rewritereplace, $wp_rewrite->permalink_structure ), 1 );
+			$regex = trailingslashit( $regex );
+			$regex .= $this->query_var . '(/([0-9]*))?/?$';
+
+			add_rewrite_rule( $regex, $wp_rewrite->index . '?category_name=$matches[1]&name=$matches[2]&' . $this->query_var . '=$matches[4]', 'top' );
 		}
 	}
 
