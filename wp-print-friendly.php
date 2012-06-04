@@ -4,7 +4,7 @@ Plugin Name: WP Print Friendly
 Plugin URI: http://www.thinkoomph.com/plugins-modules/wp-print-friendly/
 Description: Extends WordPress' template system to support printer-friendly templates. Works with permalink structures to support nice URLs.
 Author: Erick Hitter (Oomph, Inc.)
-Version: 0.5.1
+Version: 0.5.2
 Author URI: http://www.thinkoomph.com/
 */
 
@@ -150,11 +150,12 @@ class wp_print_friendly {
 	/**
 	 * Determine if print template is being requested.
 	 *
-	 * @uses get_query_var
+	 * @global $wp_query
 	 * @return bool
 	 */
 	public function is_print() {
-		return (bool) get_query_var( $this->query_var );
+		global $wp_query;
+		return is_array( $wp_query->query ) && array_key_exists( $this->query_var, $wp_query->query );
 	}
 
 	/**
